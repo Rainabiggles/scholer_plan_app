@@ -28,8 +28,31 @@ class MyApp extends StatelessWidget {
 // =========================================================
 // SCREEN 1: WELCOME / GET STARTED SCREEN (#1 from right side in PDF)
 // =========================================================
-class WelcomeScreen extends StatelessWidget {
+class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
+
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _checkLoginStatus();
+  }
+
+  // Check if user is already logged in from previous session
+  Future<void> _checkLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+    if (isLoggedIn && mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -138,11 +161,15 @@ class WelcomeScreen extends StatelessWidget {
 class SignUpScreen extends StatelessWidget {
   const SignUpScreen({super.key});
 
-  void _navigateToHome(BuildContext context) {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const HomeScreen()),
-    );
+  Future<void> _navigateToHome(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', true);
+    if (context.mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+      );
+    }
   }
 
   @override
@@ -309,7 +336,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // 1. STATE VARIABLES (Our App's Memory)
   List<String> notes = [];
   List<String> dates = [];
@@ -326,12 +353,30 @@ class _HomeScreenState extends State<HomeScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('notes', notes);
     await prefs.setStringList('dates', dates);
+    await prefs.setString('draft_note', _noteController.text);
+    await prefs.setString('draft_date', selectedDate);
   }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     loadFromStorage();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _noteController.dispose();
+    _editController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      saveToStorage();
+    }
   }
 
   Future<void> loadFromStorage() async {
@@ -339,6 +384,8 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       notes = prefs.getStringList('notes') ?? [];
       dates = prefs.getStringList('dates') ?? [];
+      _noteController.text = prefs.getString('draft_note') ?? '';
+      selectedDate = prefs.getString('draft_date') ?? 'No date chosen';
     });
   }
 
@@ -356,6 +403,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         selectedDate = DateFormat('MMM dd, yyyy').format(pickedDate);
       });
+      saveToStorage();
     }
   }
 
@@ -462,13 +510,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  @override
-  void dispose() {
-    _noteController.dispose();
-    _editController.dispose();
-    super.dispose();
-  }
-
   // =========================================================
   // PART D: USER INTERFACE (TASK PLANNER)
   // =========================================================
@@ -488,12 +529,16 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Log out',
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const WelcomeScreen()),
-                (route) => false,
-              );
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('isLoggedIn', false);
+              if (context.mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+                  (route) => false,
+                );
+              }
             },
           ),
         ],
@@ -515,6 +560,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     TextField(
                       controller: _noteController,
+                      onChanged: (val) => saveToStorage(),
                       decoration: const InputDecoration(
                         labelText: 'What do you need to do?',
                         hintText: 'e.g., Finish Flutter Project',
