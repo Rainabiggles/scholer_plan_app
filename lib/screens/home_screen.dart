@@ -314,14 +314,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 IconButton(
                                   icon: const Icon(
                                     Icons.edit,
-                                    color: Colors.yellow,
+                                    color: Colors.lightBlueAccent,
                                   ),
                                   onPressed: () => editTask(index),
                                 ),
                                 IconButton(
                                   icon: const Icon(
                                     Icons.delete,
-                                    color: Colors.yellow,
+                                    color: Colors.lightBlueAccent,
                                   ),
                                   onPressed: () => deleteTask(index),
                                 ),
