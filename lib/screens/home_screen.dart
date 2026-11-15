@@ -235,6 +235,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     TextField(
                       controller: _noteController,
                       onChanged: (val) => saveToStorage(),
+                      onSubmitted: (val) => addTask(),
                       decoration: const InputDecoration(
                         labelText: 'What do you need to do?',
                         hintText: 'e.g., Finish Flutter Project',
